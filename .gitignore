@@ -50,3 +50,6 @@ rsconnect/
 
 # add ds_store
 .DS_Store
+
+# add data folder
+data/*
