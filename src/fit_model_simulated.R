@@ -19,8 +19,8 @@ for (c in c_values){
     fit <- model$sample(
         data = list(
             N = n_trials,
-            attributes = attributes,
-            categories = categories,
+            attributes = as.matrix(attributes),
+            category = categories,
             choices = choices
         ),
         chains = 4,
