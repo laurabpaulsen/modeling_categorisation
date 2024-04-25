@@ -95,9 +95,12 @@ gcm <- function(
       # get the similiarity for the current stimuli to each of the observations in each of the categories
       similarites_category0 <- calculate_all_similiarities(category0, tmp_stim, w, c)
       similarites_category1 <- calculate_all_similiarities(category1, tmp_stim, w, c)
-    
-      numerator <- 0.5 * sum(similarites_category0)
-      denominator <- 0.5 * sum(similarites_category0) + 0.5 * sum(similarites_category1)
+
+
+      # QUESTION? DOES THIS STANDARDISE SOME HOW? DOES IT NOT MATTER HOW MANY OF EACH EXAMPLE YOU HAVE SEEN IN EACH CATEGORY WHEN TAKING THE SUM?????
+      # Answer from ricc: Should be mean (changes have been made to the code)
+      numerator <- 0.5 * mean(similarites_category0)
+      denominator <- 0.5 * mean(similarites_category0) + 0.5 * mean(similarites_category1)
       
       tmp_choice_prop <- numerator / denominator
   
