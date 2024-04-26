@@ -1,87 +1,114 @@
+// GENERALISED CONTEXT MODEL 
+// ---------------------------------
+// GCM stores every category exemplar encountered in memory according to a geometric representation
+// GCM adds each exemplar to the pile of relevant category (as per feedback)
+// GCM has thus built two sets of exemplars, one for each category, and all subsequent stimuli are classified by referring to those memorised ensembles
+
+// TEST PHASE: 
+// New stimulus
+// Calculates distance between rep of test stim and each of learned exemplars, applying pre-given weights to each feature
+// Calculate sim between stimuli using exp decay function
+// Identify similarity to a category using average
+// Identify probability of attributing to category using sim1/sim1+sim2
+
+// We want to calculate sim of each stim to exemplars of each cat using an exp decay based on weighted distance measures. Then we use these similarities to calculate the probability of a response belonging to a given category
+
 data {
-    int<lower=0> N;                                 // number of trials
-    array[N, 5] int<lower=0, upper = 1> attributes; // attributes of the stimuli for each trial
-    array[N] int<lower=0, upper = 1> category;   // true categories of each of the trials
-    array[N] int<lower=0, upper = 1> choices;       // responses of the participant (pertaining to the category)  
+  int<lower=1> ntrials; // number of trials
+  int<lower=1> nfeatures; // number of predefined relevant features
+  array[ntrials] int<lower=0, upper=1> cat_one; // true responses on a trial by trial basis
+  array[ntrials] int<lower=0, upper=1> y; // decisions on a trial by trial basis
+  array[ntrials, nfeatures] real obs; // stimuli as vectors of features
+  real<lower=0, upper=1> b; // initial bias for category one over two
+
+  // priors
+  vector[nfeatures] w_prior_values; // concentration parameters for dirichlet distribution
+  array[2] real c_prior_values; // mean and variance for logit-normal distribution
 }
 
-
 transformed data {
-    array[N] real<lower=0, upper=1> choice_prob; // probability of choosing category 1
+  array[ntrials] int<lower=0, upper=1> cat_two; // dummy var for cat two over cat 1
+  array[sum(cat_one)] int<lower=1, upper=ntrials> cat_one_idx; // array of which stim are cat 1
+  array[ntrials-sum(cat_one)] int<lower=1, upper=ntrials> cat_two_idx; // array of which stimuli are cat 2
+  int idx_one = 1; // initializing
+  int idx_two = 1; 
+  
+  for (i in 1:ntrials) {
+    cat_two[i] = abs(cat_one[i]-1);
     
-    int n_cat0_prev = 0;
-    int n_cat1_prev = 0;
-
-    for (n in 1:N){
-        // current stimuli == attributes[n]
-    
-
-        // if atleast one of the categories are empty, set the probability to 0.5
-        if (n_cat0_prev == 0 || n_cat1_prev == 0){
-            choice_prob[n] = 0.5;
-        } 
-        
-        // otherwise calculate the probability of choosing category using the CGM
-       else {
-            // insert one million things here
-            real dist_cat0 = 0;
-            real dist_cat1 = 0;
-
-            real similarity_cat0 = 0;
-            real similarity_cat1 = 0;
-
-
-            // start by calculating the distance to all previous exemplars
-            for (e in 1:N-1){
-                if (category[e] == 0){
-                    // do something
-                } 
-                else {
-                    // do the same thing but for category 1
-                }
-            }
-
-
-
-
-        }
-
-
-        // update the count of the previous exemplars shown
-        if (category[n] == 0){
-            n_cat0_prev += 1;
-        } 
-        else {
-            n_cat1_prev += 1;
-        }
-
-
+    if (cat_one[i]==1){
+      cat_one_idx[idx_one] = i;
+      idx_one +=1;
+      
+    } else {
+      cat_two_idx[idx_two] = i;
+      idx_two += 1;
     }
-
+    
+  }
 }
 
 parameters {
-    // array[5] real w; maybe at some point implement a weight for each of the features
-    real log_c;   
+  simplex[nfeatures] w; // simplex means sum(w)=1
+  real logit_c;
 }
-
 
 transformed parameters {
-    real c;
+  real<lower=0, upper=2> c = inv_logit(logit_c)*2;
+  
+  array[ntrials] real<lower=0.0001, upper=0.9999> r;
+  array[ntrials] real rr;
+  
+  for (i in 1:ntrials){
+    
+    array[(i-1)] real exemplar_sim;
+    for (e in 1:(i-1)){
+      
+      array[nfeatures] real tmp_dist;
+      for (j in 1:nfeatures){
+        tmp_dist[j]=w[j]*abs(obs[e,j] - obs[i,j]);
+        
+      }
+      exemplar_sim[e]=exp(-c*sum(tmp_dist));
+    }
 
-    // scale the parameter to be between 0 and 2??? Ricc did this but is it really constrained between 0 and 2?
-    // Ricc:  "model is difficult to fit if you assume it can be higher than two
-    // hard boundaries not always nice, but makes the model run sooooo <333"
-    c = inv_logit(log_c)*2; 
+  if (sum(cat_one[:(i-1)])==0 || sum(cat_two[:(i-1)])==0){
+    r[i] = 0.5;
+  } else {
+    array[2] real similarities;
+    
+    array[sum(cat_one[:(i-1)])] int tmp_idx_one = cat_one_idx[:sum(cat_one[:(i-1)])];
+    array[sum(cat_two[:(i-1)])] int tmp_idx_two = cat_two_idx[:sum(cat_two[:(i-1)])];
+    similarities[1] = mean(exemplar_sim[tmp_idx_one]);
+    similarities[2] = mean(exemplar_sim[tmp_idx_two]);
+    
+    rr[i] = (b*similarities[1])/(b*similarities[1]+(1-b)*similarities[2]);
+    
+    if (rr[i] > 0.9999){
+      r[i] = 0.9999;
+      
+    } else if (rr[i] < 0.0001) {
+      r[i] = 0.0001;
+    } else if (rr[i] > 0.0001 && rr[i] < 0.9999) {
+      r[i] = rr[i];
+    } else {
+      r[i] = 0.5;
+      }
+    }
+  }
 }
-
-
-
 
 model {
-    // setting a prior for c
-    target += normal_lpdf(log_c | 0, 1);
-}
-
-
+  // Defining the likelihood of each observed choice given the prob r[i] which is calculated in the transformed parameters block as the probability of resp being category 1. 
+  // Likelihood is computed using a bernoulli prob mass function which is appropriate for binary choice data
+  
+  // Priors
+  target += dirichlet_lpdf(w | w_prior_values); // prior on the attention weights
+  target += normal_lpdf(logit_c | c_prior_values[1], c_prior_values[2]); // prior on the logit of the scaling parameter
+  
+  // Decision Data
+  // Vectorized decision data likelihood
+  target += bernoulli_lpmf(y | r);
+  
+  }
 
