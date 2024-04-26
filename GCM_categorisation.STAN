@@ -54,7 +54,7 @@ parameters {
 }
 
 transformed parameters {
-  real<lower=0, upper=2> c = inv_logit(logit_c)*2;
+  real<lower=0, upper=5> c = inv_logit(logit_c)*5;
   
   array[ntrials] real<lower=0.0001, upper=0.9999> r;
   array[ntrials] real rr;
@@ -111,4 +111,25 @@ model {
   target += bernoulli_lpmf(y | r);
   
   }
+
+
+
+generated quantities {
+  real posterior_c;
+  posterior_c = inv_logit(logit_c)*5;
+
+  real prior_c;
+  prior_c = inv_logit(normal_rng(c_prior_values[1], c_prior_values[2]))*5;
+
+  array[nfeatures] real posterior_w;
+  for (i in 1:nfeatures){
+    posterior_w[i] = w[i];
+  }
+
+  array[nfeatures] real prior_w;
+  for (i in 1:nfeatures){
+    prior_w[i] = dirichlet_rng(w_prior_values)[i];
+  }
+
+}
 
