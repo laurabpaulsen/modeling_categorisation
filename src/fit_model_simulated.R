@@ -1,5 +1,3 @@
-# This script runs the simple bayes model on the data from 
-# Simonsen et al and saves the output.
 # Assumes the presence of a Stan model file called "GCM_categorisation.stan".
 # Reads in the simulated data files created by simulate_data.R.
 # Fits the GCM Stan model to the simulated data and runs the Bayesian inference process.
@@ -13,20 +11,9 @@ if (!requireNamespace("cmdstanr", quietly = TRUE)) {
 }
 
 library(pacman)
-
+source("simulation_params.R") # loads the c values and lists of weights (so that we do not have to change in all scripts)
 pacman::p_load(cmdstanr,
                tidyverse)
-
-# Defining the sequence of 'c' parameter values for which the model should be run
-c_values <- seq(0.1, 5, 0.5)
-
-list_of_weights <- list(
-  c(1/5, 1/5, 1/5, 1/5, 1/5),
-  c(0.9, 0.1/4, 0.1/4, 0.1/4, 0.1/4),
-  c(0.5, 0.4, 0.1, 0.1, 0.1)
-)
-
-
 
 # Looping over each 'c' value to fit the model on the respective simulated dataset
 for (c in c_values) {

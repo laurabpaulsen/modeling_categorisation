@@ -1,20 +1,9 @@
 library(tidyverse)
 source("simulation_functions.R")
+source("simulation_params.R") # loads the c values and lists of weights (so that we do not have to change in all scripts)
 
 # create a data folder
 dir.create("data", showWarnings = FALSE)
-
-
-# loop over values of c
-c_values <- seq(0.1, 5, 0.5)
-
-
-list_of_weights <- list(
-  c(1/5, 1/5, 1/5, 1/5, 1/5),
-  c(0.9, 0.1/4, 0.1/4, 0.1/4, 0.1/4),
-  c(0.5, 0.4, 0.1, 0.1, 0.1)
-)
-
 
 for (c in c_values){
   # setup experimental design
