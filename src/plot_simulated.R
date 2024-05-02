@@ -25,13 +25,13 @@ for (c in c_values) {
       fit_df$w4 <- w[4]
       fit_df$w5 <- w[5]
 
+      # Columns to convert to factors
+      columns <- c("c", "w1", "w2", "w3", "w4", "w5")
 
-      fit_df$c <- as.factor(fit_df$c)
-      fit_df$w1 <- as.factor(fit_df$w1)
-      fit_df$w2 <- as.factor(fit_df$w2)
-      fit_df$w3 <- as.factor(fit_df$w3)
-      fit_df$w4 <- as.factor(fit_df$w4)
-      fit_df$w5 <- as.factor(fit_df$w5)
+      # Convert columns to factors using a loop
+      for (col in columns) {
+        fit_df[[col]] <- as.factor(fit_df[[col]])
+      }
       
       fit_df$weights_string <- paste(w[1], w[2], w[3], w[4], w[5])
 
@@ -55,14 +55,17 @@ ggsave("fig/recovery_of_c.png")
 
 
 
-ggplot(dataframe) + 
-  geom_density_ridges(aes(x = `posterior_w[1]`, y = w1, fill = c), alpha = 0.5) +
-  facet_wrap(~c) +
-  labs(title = "Posterior density for w1",
-       x = "Estimated w1",
-       y = "True w1") +
-  xlim(0, 1) +
+for (w in 1:5) {
+  ggplot(dataframe) +
+    
+    geom_density_ridges(aes(x = `paste0("posterior_w[", w, "]")`, y = paste0("w", w), fill = c), alpha = 0.5) +
+    facet_wrap(~c) +
+    labs(title = "Posterior density for w1",
+         x = "Estimated w1",
+         y = "True w1") +
+    xlim(0, 1) +
+    theme_bw()
+    ggsave(paste0("fig/recovery_of_w", w, ".png"))
+}
 
-  theme_bw()
 
-ggsave("fig/recovery_of_w1.png")
