@@ -15,11 +15,20 @@ source("simulation_params.R") # loads the c values and lists of weights (so that
 pacman::p_load(cmdstanr,
                tidyverse)
 
+
+
+n_trials = "96_trials"
+
+
+# create output folder
+output_dir <- paste0("fits/", n_trials)
+dir.create(output_dir, showWarnings = FALSE)
+
 # Looping over each 'c' value to fit the model on the respective simulated dataset
 for (c in c_values) {
   # Read the simulated data from the appropriate RDS file
   for (w in list_of_weights) {
-    data <- readRDS(paste0("data/c_", c, "_w_", paste0(w, collapse = "_"), ".rds"))
+    data <- readRDS(paste0("data/", n_trials, "/c_", c, "_w_", paste0(w, collapse = "_"), ".rds"))
   
     # Load the Stan model
     model <- cmdstan_model("GCM_categorisation.stan")
@@ -39,7 +48,7 @@ for (c in c_values) {
                                         Var5)), # Features matrix
         b = 0.5, # Initial bias for cat one over two, adjust maybe?
         w_prior_values = rep(1,5), # uniform prior for the feature weights for now
-        c_prior_values = c(0,1) # m and sd for the scaling parameter
+        c_prior_values = c(0,1) # m and sd for the scaling parameter 
       ),
       
       chains = 4,
@@ -50,7 +59,7 @@ for (c in c_values) {
     )
     
     # Save the posterior samples from the Stan model fit
-    fit$save_object(file = paste0("fits/model_fit_c_", c, "_w_", paste0(w, collapse = "_"), ".rds"))
+    fit$save_object(file = paste0(output_dir, "/model_fit_c_", c, "_w_", paste0(w, collapse = "_"), ".rds"))
     
     
     # Print a message indicating completion of this iteration

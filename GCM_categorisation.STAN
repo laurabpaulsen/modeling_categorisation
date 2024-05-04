@@ -106,6 +106,9 @@ model {
   target += dirichlet_lpdf(w | w_prior_values); // prior on the attention weights
   target += normal_lpdf(logit_c | c_prior_values[1], c_prior_values[2]); // prior on the logit of the scaling parameter
   
+  // try a beta distribution
+  // target += beta_lpdf(logit_c | c_prior_values[1], c_prior_values[2]);
+
   // Decision Data
   // Vectorized decision data likelihood
   target += bernoulli_lpmf(y | r);
