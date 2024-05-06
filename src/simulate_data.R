@@ -25,7 +25,7 @@ for (n_repeats in c(3)){ #, 10)){
     stimuli <- experiment %>% select("Var1", "Var2", "Var3", "Var4", "Var5")
 
     for(w in list_of_weights){
-      print(paste0("Finished simulating data for c = ", c, " and w = ", w))
+      print(paste0("Finished simulating data for c = ", c, " and w = ", paste(w, sep=", ")))
       # make choices according to the GCM
       agent_choices <- gcm(
         w = w,

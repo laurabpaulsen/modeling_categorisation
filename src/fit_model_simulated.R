@@ -12,27 +12,47 @@ if (!requireNamespace("cmdstanr", quietly = TRUE)) {
 
 library(pacman)
 source("simulation_params.R") # loads the c values and lists of weights (so that we do not have to change in all scripts)
+
+
 pacman::p_load(cmdstanr,
                tidyverse)
 
 
+skip_fitted <- F
 
 n_trials = "96_trials"
 
 
 # create output folder
 output_dir <- paste0("fits/", n_trials)
+cmdst_output_dir <- paste0("fits/", n_trials, "/cmdstan")
 dir.create(output_dir, showWarnings = FALSE)
+dir.create(cmdst_output_dir, showWarnings = FALSE)
+
+# Load the Stan model
+Sys.setenv(CXXFLAGS = "-flarge-source-files -Ofast")
+model <- cmdstan_model(
+    "GCM_categorisation.stan",
+    stanc_options = list(
+        "O1"
+    ),
+    compile_model_methods = TRUE
+)
 
 # Looping over each 'c' value to fit the model on the respective simulated dataset
 for (c in c_values) {
   # Read the simulated data from the appropriate RDS file
   for (w in list_of_weights) {
+    output_basename <- paste0("model_fit_c_", c, "_w_", paste0(w, collapse = "_"))
+    fit_file <- paste0(output_dir, "/", output_basename, ".rds")
+    
+    if (skip_fitted && file.exists(fit_file)) {
+      cat("Model fit for c =", c, "and w =", w, "already exists, skipping...\n")
+      next
+    }
+
     data <- readRDS(paste0("data/", n_trials, "/c_", c, "_w_", paste0(w, collapse = "_"), ".rds"))
   
-    # Load the Stan model
-    model <- cmdstan_model("GCM_categorisation.stan")
-    
     # Run the Stan model using the cmdstanr 'sample' method
     fit <- model$sample(
       data = list(
@@ -50,7 +70,8 @@ for (c in c_values) {
         w_prior_values = rep(1,5), # uniform prior for the feature weights for now
         c_prior_values = c(0,1) # m and sd for the scaling parameter 
       ),
-      
+      output_dir = cmdst_output_dir,
+      output_basename = output_basename,
       chains = 4,
       parallel_chains = 4,
       iter_warmup = 1000,
@@ -59,7 +80,7 @@ for (c in c_values) {
     )
     
     # Save the posterior samples from the Stan model fit
-    fit$save_object(file = paste0(output_dir, "/model_fit_c_", c, "_w_", paste0(w, collapse = "_"), ".rds"))
+    fit$save_object(file = fit_file)
     
     
     # Print a message indicating completion of this iteration

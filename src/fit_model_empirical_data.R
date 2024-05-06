@@ -1,6 +1,10 @@
 library(pacman)
 pacman::p_load(tidyverse, cmdstanr)
 
+
+skip_fitted <- F
+exp_session <- 1
+
 extract_stimulus_features <- function(stimulus) {
     ## takes a stimulus string (xxxxx.jpg) and returns a vector of the features
     
@@ -39,22 +43,43 @@ extract_danger_response <- function(response) {
 data <- read.table("data/AlienData.txt", sep = ",", header = TRUE)
 
 # only keep data from session 1 (so we have the same rule for danger and nutritious as in the simulated data)
-data <- data %>% filter(session == 1)
+data <- data %>% filter(session == exp_session)
 
 # just as a test fit a model on the first participant's data
 subjects <- unique(data$subject)
 
+# Load the Stan model
+Sys.setenv(CXXFLAGS = "-flarge-source-files -Ofast")
+model <- cmdstan_model(
+    "GCM_categorisation.stan",
+    stanc_options = list(
+        "O1"
+    ),
+    compile_model_methods = TRUE
+)
+
+output_dir <- paste0("fits/emprical_session_", exp_session)
+cmdst_output_dir <- paste0(output_dir, "/cmdstan")
+dir.create(output_dir, showWarnings = FALSE)
+dir.create(cmdst_output_dir, showWarnings = FALSE)
 
 for (s in subjects) {
+    output_basename <- paste0("participant_", s)
+    fit_file <- paste0(output_dir, "/", output_basename, "_fit.rds")
+    fit_summary_csv <- paste0(output_dir, "/", output_basename, "_fit_summary.csv")
+
+
+    if (skip_fitted && file.exists(fit_file)) {
+        cat("Model fit for participant =", s, "already exists, skipping...\n")
+        next
+    }
+
     subject_data <- data %>% filter(subject == s)
     category <- subject_data$dangerous
   
     # extract the features from the stimuli strings
     features <- subject_data$stimulus %>% map(extract_stimulus_features) 
     features <- do.call(rbind, features)   # convert the list of vectors to a matrix
-  
-    # Load the Stan model
-    model <- cmdstan_model("GCM_categorisation.stan")
     
     # Run the Stan model using the cmdstanr 'sample' method
     fit <- model$sample(
@@ -68,7 +93,8 @@ for (s in subjects) {
             w_prior_values = rep(1,5),                          # uniform prior for the feature weights for now
             c_prior_values = c(0,1)                             # m and sd for the scaling parameter
         ),
-        
+        output_dir = cmdst_output_dir,
+        output_basename = output_basename,
         chains = 4,
         parallel_chains = 4,
         iter_warmup = 1000,
@@ -77,11 +103,11 @@ for (s in subjects) {
     )
     
     # Save the posterior samples from the Stan model fit
-    fit$save_object(file = paste0("fits/model_fit_participant_", s, ".rds"))
+    fit$save_object(file = fit_file)
     
     # Save a summary of the fit to CSV
     fit_summary <- fit$summary()
-    write.csv(fit_summary, file = paste0("fits/fit_summary_participant_", s, ".csv"))
+    write.csv(fit_summary, file = fit_summary_csv)
     
     # Print a message indicating completion of this iteration
     cat("Finished fitting model for participant =", s, "\n")
