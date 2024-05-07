@@ -68,6 +68,20 @@ data$participant <- paste0(data$subject, "_", data$condition)
 data$participant <- as.factor(data$participant)
 unique_participants <- unique(data$participant)
 
+extract_danger_response <- function(response) {
+    ## takes a response int (1, 2, 3, or 4) and returns a binary value indicating dangerous (1) or not dangerous (0)
+    # CHECK HOW THIS SHOULD BE!!!! Which numbers are actually dangerous?
+    responses <- c()
+    
+    for (i in 1:length(response)) {
+        if (response[i] == 3 || response[i] == 4) {
+            responses <- c(responses, 1)
+        } else {
+            responses <- c(responses, 0)
+        }
+    }
+    return (responses)
+}
 
 
 tmp_data <- tibble()
@@ -76,7 +90,7 @@ for (s in unique_participants) {
     subject_data <- data %>% filter(participant == s)
 
     subject_data$trial <- 1:nrow(subject_data)
-    subject_data$correct <- as.integer(subject_data$response == subject_data$dangerous)
+    subject_data$correct <- as.integer(extract_danger_response(subject_data$response) == subject_data$dangerous)
 
     # cumulative correct
     subject_data$cumulative_accuracy <- cumsum(subject_data$correct) / 1:nrow(subject_data)
