@@ -7,12 +7,11 @@ source("simulation_params.R") # loads the c values and lists of weights (so that
 
 
 
-trials <- "96_trials"
+trials <- "320_trials"
 dataframe <- tibble()
 
 for (c in c_values) {
   for (w in list_of_weights) {
-    print(w)
       # Read the simulated data from the appropriate rds file
       fit <- readRDS(paste0("fits/", trials,"/model_fit_c_", c, "_w_", paste0(w, collapse = "_"), ".rds"))
 
@@ -29,6 +28,7 @@ for (c in c_values) {
                "posterior_w5" = "posterior_w[5]")
       
       fit_df$c <- c
+      fit_df$c <- as.factor(fit_df$c)
       fit_df$w1 <- w[1]
       fit_df$w2 <- w[2]
       fit_df$w3 <- w[3]
@@ -79,5 +79,39 @@ for (w in 1:5) {
     theme_bw()
     ggsave(paste0("fig/", trials, "_posterior_density_w", w, ".png"))
 }
+
+
+
+
+simulated_data <- tibble()
+
+for (c in c_values) {
+  for (w in list_of_weights) {
+    # Read the simulated data from the appropriate rds file
+    data <- readRDS(paste0("data/", trials, "/c_", c, "_w_", paste0(w, collapse = "_"), ".rds"))
+    data$c <- c
+    data$c <- as.factor(data$c)
+    data$trial <- 1:nrow(data)
+    data$weights_string <- paste(w[1], w[2], w[3], w[4], w[5])
+    data$correct <- ifelse(data$danger == data$choice, 1, 0)
+
+    # make accumulated accuracy
+    data$accumulated_accuracy <- cumsum(data$correct) / 1:nrow(data)
+    
+    
+    simulated_data <- bind_rows(simulated_data, data)
+  }
+}
+
+## plotting the accumulated accuracy
+ggplot(simulated_data) +
+  geom_line(aes(x = trial, y = accumulated_accuracy, color = c), alpha = 0.5) +
+  facet_wrap(~weights_string) +
+  labs(title = "Accumulated accuracy",
+       x = "Trial",
+       y = "Accuracy") +
+  theme_bw()
+
+ggsave(paste0("fig/", trials, "_accumulated_accuracy.png"))
 
 
