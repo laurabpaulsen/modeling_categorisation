@@ -55,7 +55,8 @@ model <- cmdstan_model(
     stanc_options = list(
         "O1"
     ),
-    compile_model_methods = TRUE
+    cpp_options = list(stan_opencl = TRUE),
+    compile_model_methods = FALSE
 )
 
 output_dir <- paste0("fits/emprical_session_", exp_session)
@@ -78,7 +79,7 @@ for (s in subjects) {
     category <- subject_data$dangerous
   
     # extract the features from the stimuli strings
-    features <- subject_data$stimulus %>% map(extract_stimulus_features) 
+    features <- subject_data$stimulus %>% purrr::map(extract_stimulus_features) 
     features <- do.call(rbind, features)   # convert the list of vectors to a matrix
     
     # Run the Stan model using the cmdstanr 'sample' method

@@ -36,7 +36,8 @@ model <- cmdstan_model(
     stanc_options = list(
         "O1"
     ),
-    compile_model_methods = TRUE
+    cpp_options = list(stan_opencl = TRUE),
+    compile_model_methods = FALSE
 )
 
 # Looping over each 'c' value to fit the model on the respective simulated dataset
@@ -81,7 +82,12 @@ for (c in c_values) {
     
     # Save the posterior samples from the Stan model fit
     fit$save_object(file = fit_file)
-    
+    fit$save_data_file(dir = cmdst_output_dir, basename = output_basename)
+
+    cat("Calculating LOO for c =", c, "and w =", w, "\n")
+    loo_result <- fit$loo(save_psis = TRUE, cores=4, is_method="psis")
+    # save the loo result
+    saveRDS(loo_result, file = paste0(output_dir, "/", output_basename, "_loo.rds"))
     
     # Print a message indicating completion of this iteration
     cat("Finished fitting model for c =", c, "\n", "and w = ", w, "\n")

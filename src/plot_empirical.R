@@ -11,7 +11,7 @@ dataframe <- tibble()
   
 for (participant in 1:27) {
     # Read the fit
-    fit <- readRDS(paste0("fits/model_fit_participant_", participant, ".rds"))
+    fit <- readRDS(paste0("fits/empirical_session_1/participant_", participant, "_fit.rds"))
 
     # extract the posterior
     posterior <- fit$draws()
@@ -54,5 +54,3 @@ for (w in 1:5) {
     theme_bw()
     ggsave(paste0("fig/estimated_w", w, ".png"))
 }
-
-
