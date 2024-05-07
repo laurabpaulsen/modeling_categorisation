@@ -65,7 +65,7 @@ calculate_all_similiarities <- function(prev_stim, current_stim, w, c){
 
 gcm <- function(
     w, # weights for each of the stimuli attributes
-    c, 
+    c, # context-depencey parameter
     stimuli, # stimuli shown
     category # the category of the stimuli (e.g., dangerous)
     ){

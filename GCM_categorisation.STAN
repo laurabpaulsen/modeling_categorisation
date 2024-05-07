@@ -18,12 +18,12 @@ data {
   int<lower=1> nfeatures; // number of predefined relevant features
   array[ntrials] int<lower=0, upper=1> cat_one; // true responses on a trial by trial basis
   array[ntrials] int<lower=0, upper=1> y; // decisions on a trial by trial basis
-  array[ntrials, nfeatures] real obs; // stimuli as vectors of features
+  matrix[ntrials, nfeatures] obs; // stimuli as vectors of features
   real<lower=0, upper=1> b; // initial bias for category one over two
 
   // priors
   vector[nfeatures] w_prior_values; // concentration parameters for dirichlet distribution
-  array[2] real c_prior_values; // mean and variance for logit-normal distribution
+  vector[2] c_prior_values; // mean and variance for logit-normal distribution
 }
 
 transformed data {
@@ -54,46 +54,29 @@ parameters {
 }
 
 transformed parameters {
-  real<lower=0, upper=5> c = inv_logit(logit_c)*5;
+  real<lower=0, upper=5> c = inv_logit(logit_c) * 5;
   
   array[ntrials] real<lower=0.0001, upper=0.9999> r;
-  array[ntrials] real rr;
+  vector[ntrials] rr;
   
+  // trials
   for (i in 1:ntrials){
-    
-    array[(i-1)] real exemplar_sim;
-    for (e in 1:(i-1)){
-      
-      array[nfeatures] real tmp_dist;
-      for (j in 1:nfeatures){
-        tmp_dist[j]=w[j]*abs(obs[e,j] - obs[i,j]);
-        
-      }
-      exemplar_sim[e]=exp(-c*sum(tmp_dist));
-    }
-
-  if (sum(cat_one[:(i-1)])==0 || sum(cat_two[:(i-1)])==0){
-    r[i] = 0.5;
-  } else {
-    array[2] real similarities;
-    
-    array[sum(cat_one[:(i-1)])] int tmp_idx_one = cat_one_idx[:sum(cat_one[:(i-1)])];
-    array[sum(cat_two[:(i-1)])] int tmp_idx_two = cat_two_idx[:sum(cat_two[:(i-1)])];
-    similarities[1] = mean(exemplar_sim[tmp_idx_one]);
-    similarities[2] = mean(exemplar_sim[tmp_idx_two]);
-    
-    rr[i] = (b*similarities[1])/(b*similarities[1]+(1-b)*similarities[2]);
-    
-    if (rr[i] > 0.9999){
-      r[i] = 0.9999;
-      
-    } else if (rr[i] < 0.0001) {
-      r[i] = 0.0001;
-    } else if (rr[i] > 0.0001 && rr[i] < 0.9999) {
-      r[i] = rr[i];
-    } else {
+    // if it's the first trial, we have no prior information to base our decision on
+    if (i == 1 || sum(cat_one[:(i-1)])==0 || sum(cat_two[:(i-1)])==0){
       r[i] = 0.5;
+    } else {
+      matrix[i-1, nfeatures] tmp_dist = rep_matrix(w', i-1) .* abs(obs[1:(i-1),:] - rep_matrix(obs[i,:], i-1));
+      vector[i-1] exemplar_sim;
+      for (j in 1:(i-1)){
+        exemplar_sim[j] = exp(-c*sum(tmp_dist[j,:]));
       }
+      
+      array[sum(cat_one[:(i-1)])] int tmp_idx_one = cat_one_idx[:sum(cat_one[:(i-1)])];
+      array[sum(cat_two[:(i-1)])] int tmp_idx_two = cat_two_idx[:sum(cat_two[:(i-1)])];
+
+      rr[i] = (b*mean(exemplar_sim[tmp_idx_one]))/(b*mean(exemplar_sim[tmp_idx_one])+(1-b)*mean(exemplar_sim[tmp_idx_two]));
+      // clamp the value
+      r[i] = fmax(0.0001, fmin(rr[i], 0.9999));
     }
   }
 }
@@ -112,8 +95,8 @@ model {
   // Decision Data
   // Vectorized decision data likelihood
   target += bernoulli_lpmf(y | r);
-  
-  }
+
+}
 
 
 
@@ -125,14 +108,16 @@ generated quantities {
   prior_c = inv_logit(normal_rng(c_prior_values[1], c_prior_values[2]))*5;
 
   array[nfeatures] real posterior_w;
-  for (i in 1:nfeatures){
-    posterior_w[i] = w[i];
-  }
-
   array[nfeatures] real prior_w;
   for (i in 1:nfeatures){
+    posterior_w[i] = w[i];
     prior_w[i] = dirichlet_rng(w_prior_values)[i];
   }
 
+  real log_lik = 0;
+  array[ntrials] int y_pred;
+  for (i in 1:ntrials){
+    log_lik += bernoulli_lpmf(y[i] | r[i]);
+    y_pred[i] = bernoulli_rng(r[i]);
+  }
 }
-

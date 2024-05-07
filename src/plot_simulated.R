@@ -1,9 +1,88 @@
 
 library(pacman)
-pacman::p_load(posterior, ggplot2, gridExtra, tidyverse, ggridges)
+pacman::p_load(posterior, ggplot2, gridExtra, tidyverse, ggridges, loo)
 
 dir.create("fig", showWarnings = FALSE)
 source("simulation_params.R") # loads the c values and lists of weights (so that we do not have to change in all scripts)
+
+fit <- readRDS("fits/96_trials/model_fit_c_1_w_0.2_0.2_0.2_0.2_0.2.rds")
+data <- readRDS("data/96_trials/c_1_w_0.2_0.2_0.2_0.2_0.2.rds")
+fit$loo()
+# Extract the relevant parameters from the fit object
+# For this model, you need 'w' and 'logit_c'
+w <- fit$draws("w")  # Attention weights
+logit_c <- fit$draws("logit_c")  # Logit of the scaling parameter
+logit_c <- matrix(logit_c, nrow = nrow(logit_c), ncol = ncol(logit_c)[1])
+
+# Extract the observed data
+y <- data$choice_danger  # Binary decisions on a trial-by-trial basis
+obs <- as.matrix(data %>% select(Var1,
+                                        Var2,
+                                        Var3,
+                                        Var4,
+                                        Var5))  # Stimuli features
+
+# Define the number of trials and features
+ntrials <- nrow(obs)
+nfeatures <- ncol(obs)
+
+# Initialize log likelihood vector
+log_likelihood <- numeric(nrow(lp))
+print(dim(w))
+print(dim(obs))
+# Loop over each iteration and chain of the MCMC
+# Loop over each iteration and chain of the MCMC
+for (chain in 1:1000) {
+  for (iter in 1:4) {
+    # Calculate r for each trial
+    r <- rep(0, ntrials)
+    for (j in 1:ntrials) {
+      # Calculate exemplar similarities
+      exemplar_sim <- rep(0, j - 1)
+      for (e in 1:(j - 1)) {
+        tmp_dist <- rep(0, nfeatures)
+        for (k in 1:nfeatures) {
+          print(c(iter, chain, k))  # Print the current indices for debugging
+          print(w[chain, iter, k])
+          if (k <= ncol(obs)) {
+            print(obs[e, k])
+            print(obs[j, k])
+            tmp_dist[k] <- w[chain, iter, k] * abs(obs[e, k] - obs[j, k])
+          }
+        }
+        exemplar_sim[e] <- exp(-inv_logit(logit_c[iter, chain]) * sum(tmp_dist))
+      }
+      
+      # Calculate r[i] based on exemplar similarities
+      if (sum(y[1:(j - 1)]) == 0 || sum(y[1:(j - 1)]) == (j - 1)) {
+        r[j] <- 0.5
+      } else {
+        cat_one_idx <- which(y[1:(j - 1)] == 1)
+        cat_two_idx <- which(y[1:(j - 1)] == 0)
+        similarities <- c(mean(exemplar_sim[cat_one_idx]), mean(exemplar_sim[cat_two_idx]))
+        rr <- (fit$data$b * similarities[1]) / (fit$data$b * similarities[1] + (1 - fit$data$b) * similarities[2])
+        rr <- pmax(pmin(rr, 0.9999), 0.0001)  # Ensure rr stays within [0.0001, 0.9999] range
+        r[j] <- rr
+      }
+    }
+    
+    # Compute the log likelihood using the Bernoulli likelihood function
+    log_likelihood[(chain - 1) * fit$iter() + iter] <- sum(log(ifelse(y == 1, r, 1 - r)))
+  }
+}
+
+# Total log likelihood across all iterations
+total_log_likelihood <- sum(log_likelihood)
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -34,6 +113,7 @@ for (c in c_values) {
       fit_df$w3 <- w[3]
       fit_df$w4 <- w[4]
       fit_df$w5 <- w[5]
+      fit_df$log_lik <- log_lik
 
       # Columns to convert to factors
       columns <- c("c", "w1", "w2", "w3", "w4", "w5")
@@ -79,8 +159,6 @@ for (w in 1:5) {
     theme_bw()
     ggsave(paste0("fig/", trials, "_posterior_density_w", w, ".png"))
 }
-
-
 
 
 simulated_data <- tibble()

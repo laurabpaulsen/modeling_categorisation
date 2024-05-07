@@ -54,3 +54,5 @@ rsconnect/
 # add data folder
 data/*
 fits/*
+
+*.exe
