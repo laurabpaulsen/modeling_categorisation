@@ -3,12 +3,36 @@ pacman::p_load(posterior, ggplot2, gridExtra, tidyverse, ggridges)
 
 dir.create("fig", showWarnings = FALSE)
 
+Mode <- function(x) {
+  ux <- unique(x)
+  ux[which.max(tabulate(match(x, ux)))]
+}
+
+extract_danger_response <- function(response) {
+  ## takes a response int (1, 2, 3, or 4) and returns a binary value indicating dangerous (1) or not dangerous (0)
+  # CHECK HOW THIS SHOULD BE!!!! Which numbers are actually dangerous?
+  responses <- c()
+
+  for (i in 1:length(response)) {
+    if (response[i] == 3 || response[i] == 4) {
+      responses <- c(responses, 1)
+    } else {
+      responses <- c(responses, 0)
+    }
+  }
+  return(responses)
+}
+
 dataframe <- tibble()
 
+# load real data
+data <- readRDS(file = "data/empirical_data_updated_subj_ids.rds")
+
+# get subjects
+subjects <- unique(data$subject)
 
 
-
-for (participant in 1:27) {
+for (participant in subjects) {
   # Read the fit
   fit <- readRDS(paste0("fits/empirical_session_1/participant_", participant, "_fit.rds"))
 
@@ -59,10 +83,7 @@ for (w in 1:5) {
 }
 
 
-# load real data
-data <- read.table("data/AlienData.txt", sep = ",", header = TRUE)
-# only get data from session 1
-data <- data %>% filter(session == 1)
+
 # compare outcomes of each trial's y_pred[trial_num] distribution with the actual "dangerous" value
 # for each participant
 
@@ -87,12 +108,59 @@ for (participant in subjects) {
   # add "response" value for each trial from the data (matching "trial" to the trial number in the data)
   # only keeping the "response" column from the data
   cat("Adding response values for participant: ", participant, "\n")
-  fit_df <- left_join(fit_df, data %>% select(subject, trial, response), by = c("participant" = "subject", "trial" = "trial"), keep = FALSE)
+  fit_df <- left_join(fit_df, data %>% select(subject, trial, response), by = c("participant" = "subject", "trial" = "trial"))
 
 
   dataframe_preds <- bind_rows(dataframe_preds, fit_df)
 }
 
-# plot mode y_pred vs actual for each participant for each trial
-dataframe_preds %>% group_by(participant, trial) %>% summarise(y_pred = mode(y_pred)) %>% 
-  ggplot(aes(x = y_pred, y = dangerous)) + geom_point() + facet_wrap(~participant) + theme_bw()
+# plot
+preds_vs_real <- dataframe_preds %>% group_by(participant, trial) %>% summarise(response=extract_danger_response(first(response)), trial=first(trial), participant=first(participant), y_pred = Mode(y_pred)) %>% ungroup()
+preds_vs_real$pred_correct <- preds_vs_real$response == preds_vs_real$y_pred
+
+preds_vs_real$participant <- as.factor(preds_vs_real$participant)
+preds_vs_real$trial <- as.integer(preds_vs_real$trial)
+preds_vs_real$pred_correct <- as.integer(preds_vs_real$pred_correct)
+
+# boxplot of correct predictions by participant
+preds_vs_real %>%
+  ggplot(aes(x = trial, y = pred_correct, color = participant)) +
+    geom_jitter() +
+    geom_smooth(method = "loess", se = FALSE) +
+    labs(
+      title = "Correct predictions by participant",
+      x = "Trial",
+      y = "Correct prediction"
+    ) +
+    theme_bw()
+
+ggsave("fig/y_pred_vs_actual_empirical.png")
+
+# plot log likelihood of the data for each participant
+dataframe_log_lik <- tibble()
+for (participant in subjects) {
+  # Read the fit
+  cat("Participant: ", participant, "\n")
+  fit <- readRDS(paste0("fits/empirical_session_1/participant_", participant, "_fit.rds"))
+
+  # extract the posterior
+  fit_df <- fit$draws("log_lik", format = "df")
+
+  fit_df$participant <- participant
+  #fit_df$participant <- as.factor(fit_df$participant)
+
+  dataframe_log_lik <- bind_rows(dataframe_log_lik, fit_df)
+}
+
+dataframe_log_lik$participant <- as.factor(dataframe_log_lik$participant)
+
+ggplot(dataframe_log_lik, aes(x = log_lik, y = participant, fill = participant)) +
+  geom_density_ridges(alpha = 0.5) +
+  labs(
+    title = "Log likelihood of the data for each participant",
+    x = "Log likelihood",
+    y = "Density"
+  ) +
+  theme_bw()
+
+ggsave("fig/log_lik_empirical.png")

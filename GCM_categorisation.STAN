@@ -108,15 +108,11 @@ generated quantities {
   prior_c = inv_logit(normal_rng(c_prior_values[1], c_prior_values[2]))*5;
 
   array[nfeatures] real posterior_w;
-  for (i in 1:nfeatures){
-    posterior_w[i] = w[i];
-  }
-
   array[nfeatures] real prior_w;
   for (i in 1:nfeatures){
+    posterior_w[i] = w[i];
     prior_w[i] = dirichlet_rng(w_prior_values)[i];
   }
-
 
   real log_lik = 0;
   array[ntrials] int y_pred;

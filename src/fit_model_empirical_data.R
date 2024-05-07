@@ -38,11 +38,23 @@ extract_danger_response <- function(response) {
   return(responses)
 }
 
-# load data from AlienData.txt
-data <- read.table("data/AlienData.txt", sep = ",", header = TRUE)
+if (!file.exists("data/empirical_data_updated_subj_ids.rds")) {
+  # load data from AlienData.txt
+  data <- read.table("data/AlienData.txt", sep = ",", header = TRUE)
 
-# only keep data from session 1 (so we have the same rule for danger and nutritious as in the simulated data)
-data <- data %>% filter(session == exp_session)
+  # only keep data from session 1 (so we have the same rule for danger and nutritious as in the simulated data)
+  data <- data %>% filter(session == exp_session)
+  max_cond_1_subj_id <- max(data[data$condition == 1, ]$subject)
+  # subject ids are repeated between condition 1 and condition 2
+  # but in condition 1 they are dyads, and in condition 2 they are individuals
+  # so let's make the subject ids continue from condition 1 to condition 2
+  data[data$condition == 2, ]$subject <- data[data$condition == 2, ]$subject + max_cond_1_subj_id
+
+  # save the data
+  saveRDS(data, file = "data/empirical_data_updated_subj_ids.rds")
+} else {
+  data <- readRDS("data/empirical_data_updated_subj_ids.rds")
+}
 
 # just as a test fit a model on the first participant's data
 subjects <- unique(data$subject)
@@ -54,8 +66,9 @@ model <- cmdstan_model(
   stanc_options = list(
     "O1"
   ),
-  cpp_options = list(stan_opencl = TRUE),
-  compile_model_methods = FALSE
+  # opencl isn't faster now that the number of trials is halved (more time spent on copying data to GPU than on computation)
+  # cpp_options = list(stan_opencl = TRUE),
+  compile_model_methods = TRUE
 )
 
 output_dir <- paste0("fits/empirical_session_", exp_session)
@@ -99,7 +112,8 @@ for (s in subjects) {
     parallel_chains = 4,
     iter_warmup = 1000,
     iter_sampling = 1000,
-    refresh = 0 # Set to 0 to not print progress
+    refresh = 0, # Set to 0 to not print progress
+    sig_figs = 18 # set to max to avoid simplex not summing to 1 error
   )
 
   # Save the posterior samples from the Stan model fit
