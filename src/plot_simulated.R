@@ -110,6 +110,7 @@ ggplot(simulated_data) +
   labs(title = "Accumulated accuracy",
        x = "Trial",
        y = "Accuracy") +
+  ylim(0, 1) +
   theme_bw()
 
 ggsave(paste0("fig/", trials, "_accumulated_accuracy.png"))

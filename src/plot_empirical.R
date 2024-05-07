@@ -56,3 +56,43 @@ for (w in 1:5) {
 }
 
 
+
+# load data from AlienData.txt
+data <- read.table("data/AlienData.txt", sep = ",", header = TRUE)
+
+# only keep data from session 1 (so we have the same rule for danger and nutritious as in the simulated data)
+data <- data %>% filter(session == 1)
+
+# create a new participant column depending both on the subject and the condition
+data$participant <- paste0(data$subject, "_", data$condition)
+data$participant <- as.factor(data$participant)
+unique_participants <- unique(data$participant)
+
+
+
+tmp_data <- tibble()
+
+for (s in unique_participants) {
+    subject_data <- data %>% filter(participant == s)
+
+    subject_data$trial <- 1:nrow(subject_data)
+    subject_data$correct <- as.integer(subject_data$response == subject_data$dangerous)
+
+    # cumulative correct
+    subject_data$cumulative_accuracy <- cumsum(subject_data$correct) / 1:nrow(subject_data)
+
+    print(subject_data)
+
+    tmp_data <- rbind(tmp_data, subject_data)
+}
+
+ggplot(tmp_data) +
+  geom_line(aes(x = trial, y = cumulative_accuracy, color = participant), alpha = 0.5) +
+  #facet_grid(~participant) +
+  labs(title = "Accumulated accuracy",
+       x = "Trial",
+       y = "Accuracy") +
+  ylim(0, 1) +
+  theme_bw()
+
+ggsave(paste0("fig/accumulated_accuracy_empirical.png"))
